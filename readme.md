@@ -1,27 +1,79 @@
-# 0xCB Static
+# Andrew's 0xCB Static Vial
 
-Macro keypad
+Custom Vial firmware for the 0xCB Static macro pad with Bongocat OLED animation.
 
-* Keyboard Maintainer: [Conor Burns](https://github.com/conor-burns)
-* Hardware Supported: https://github.com/0xCB-dev/0xcb-static
-* Hardware Availability: On CandyKeys or order your own parts - the hardware in the repo is Open Source :D
-* PCB renders :)
+## Features
 
-![](https://github.com/0xCB-dev/0xcb-static/blob/main/PCB/rev1.0/top.png)
+- **Vial support** — remap keys and layers on the fly via [Vial](https://get.vial.today/)
+- **Bongocat OLED animation** — fullscreen RLE-compressed cat animation on the 128×32 OLED, sourced from [filterpaper/qmk_oled_animations](https://github.com/filterpaper/qmk_oled_animations)
+- **Custom OLED font** — layer names and NUM/CAP indicators rendered with custom glyphs
+- **Encoder support** — volume control with click mute
 
-![](https://github.com/0xCB-dev/0xcb-static/blob/main/PCB/rev1.0/bottom.png)
+## Bongocat Animation
 
-More Pictures [here](https://0xcb.dev/static/)
+The OLED displays a fullscreen Bongocat animation that reacts to typing activity:
 
-To go to bootloader press ESC while plugging in or hold the RESET switch, then hold the BOOT switch, release RESET, release BOOT.
-The board should now appear in lsusb (or device manager).
+| State | Trigger | Frames |
+|-------|---------|--------|
+| Idle  | > 1.6s since last keypress | 5 idle frames (loop) |
+| Paws  | 0.4–1.6s since last keypress | 1 static stretch frame |
+| Tap   | < 0.4s since last keypress | 2 tap frames (alternate) |
 
-Make example for this keyboard (after setting up your build environment):
+- Uses `last_matrix_activity_time()` for input detection — no custom `process_record_user` needed
+- `#define CAT_SHIFT 30` shifts the animation right 30 pixels so NUM/CAP indicators overlay cleanly on the left
+- RLE decoder (`decode_cat_frame`) writes shifted per-page via `oled_write_raw_byte`
 
-    make 0xcb/static:default
+Source: [filterpaper/qmk_oled_animations](https://github.com/filterpaper/qmk_oled_animations) (MIT license)
+Filterpaper's RLE Bongocat uses ~150 bytes per frame vs ~512 bytes for raw bitmaps, saving considerable flash on the ATmega328P.
 
-Flashing example for this keyboard:
+## Firmware
 
-    make 0xcb/static:flash
+- **MCU:** ATmega328P (32 KB flash, 2 KB RAM)
+- **Firmware size:** 26936 / 28672 bytes (93%, 1736 free)
+- **Bootloader:** USBasp (ICSP required — bootloader entry is broken on this board)
 
-See the [build environment setup](https://docs.qmk.fm/#/getting_started_build_tools) and the [make instructions](https://docs.qmk.fm/#/getting_started_make_guide) for more information. Brand new to QMK? Start with our [Complete Newbs Guide](https://docs.qmk.fm/#/newbs).
+### Flashing via USBasp
+
+```
+make 0xcb/static:vial:flash
+```
+
+ICSP header (J2) pinout for USBasp 10-pin → 6-pin:
+- Pin 1 (MOSI) → J2-4
+- Pin 2 (VCC)  → J2-2
+- Pin 4 (GND)  → J2-6
+- Pin 5 (RST)  → J2-5
+- Pin 7 (SCK)  → J2-3
+- Pin 9 (MISO) → J2-1
+
+## Repository Structure
+
+```
+Andrews-0xCB-Static/
+├── config.h                     # Keyboard-level config (OLED font, etc.)
+├── gfxfont.c                    # Custom OLED font (layer glyphs 0x91-0xFF)
+├── keyboard.json                # Matrix + layout definition
+├── keymaps/vial/
+│   ├── config.h                 # Vial keymap config (UID, unlock combo)
+│   ├── keymap.c                 # Keymap + Bongocat OLED code
+│   ├── rules.mk                 # Build rules (VIAL, ENCODER_MAP, OLED)
+│   └── vial.json                # Vial keyboard definition
+├── Andrew's_0xCB_Static.vil    # Vial layout export (4 layers)
+├── 0xcb_static_vial.hex        # Pre-compiled firmware
+└── readme.md
+```
+
+## Vial Layout
+
+The included `.vil` file can be loaded in Vial (File → Load Saved Layout) to restore the 4-layer keymap:
+
+- **Layer 0 (_HOME):** QWERTY alphas, MUTE on encoder press
+- **Layer 1 (_FN2):** Number row + F-keys
+- **Layer 2 (_FN3):** Numpad layer
+- **Layer 3 (_FN4):** Media keys + navigation
+
+## Credits
+
+- [0xCB-dev/0xcb-static](https://github.com/0xCB-dev/0xcb-static) — original hardware and default firmware
+- [filterpaper/qmk_oled_animations](https://github.com/filterpaper/qmk_oled_animations) — RLE-encoded Bongocat animation
+- [Vial](https://get.vial.today/) — open-source keyboard configurator
